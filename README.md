@@ -4,7 +4,7 @@ This Python script update Oracle 11g username/password and corresponding Azure K
 
 ## Pre-requsites
 - Python 3.9
-- Python packages: azure-keyvault-secrets azure-identity jaydebeapi JPype1
+- Python packages: azure-keyvault-secrets azure-identity jaydebeapi JPype1 python-dotenv
 - Java Runtime Environment (JRE) 11
 - az login with Key Vault Administrator role
 - Database login with "ALTER USER" privilege
