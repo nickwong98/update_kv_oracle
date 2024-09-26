@@ -1,0 +1,5 @@
+azure-keyvault-secrets
+azure-identity
+jaydebeapi
+JPype1
+python-dotenv
