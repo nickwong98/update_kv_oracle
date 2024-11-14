@@ -1,4 +1,5 @@
 import os
+import time
 from dotenv import dotenv_values
 from azure.identity import DefaultAzureCredential
 from azure.keyvault.secrets import SecretClient
@@ -14,7 +15,7 @@ import jaydebeapi
 ### check azure access, e.g. az account list
 
 ### SET JAVA_HOME before running this script
-### e.g. $env:JAVA_HOME="C:\jdk"
+### e.g. $env:JAVA_HOME="C:\Users\lmwn\Downloads\sqldeveloper\jdk"
 
 ### Make user ojdbc is accessible, e.g. "./ojdbc6.jar"
 
@@ -45,7 +46,8 @@ def get_key_vault_secrets(vault_url, credentials):
     for username, password in credentials.items():
         secret_name = f"{username}"
         retrieved_secret = client.get_secret(secret_name)
-        print(f"Retrieved secret for {username} in Key Vault.")
+        print(f"{username} {retrieved_secret.value}")
+        #print(f"Retrieved secret for {username} in Key Vault.")
 
 # Access Oracle database
 def access_oracle(credentials,jdbc_url, driver_class, jar_file_path, db_user, db_password):
@@ -86,6 +88,59 @@ def update_key_vault_secrets(vault_url, credentials):
         secret_name = f"{username}"
         client.set_secret(secret_name, password)
         print(f"Updated secret for {username} in Key Vault.")
+
+# Backup secrets in Azure Key Vault
+def backup_key_vault_secrets(vault_url, credentials):
+    # Authenticate using DefaultAzureCredential
+    credential = DefaultAzureCredential()
+    client = SecretClient(vault_url=vault_url, credential=credential)
+
+    for username, password in credentials.items():
+        secret_name = f"{username}"
+        secret_backup = client.backup_secret(secret_name)
+        backupfilename = f"kv_backup_{secret_name}.txt"
+        with open(backupfilename, "wb") as backupfile:
+            backupfile.write(secret_backup)
+            backupfile.close()
+        print(f"Backed up secret for {username} in Key Vault.")
+
+# Delete and purge secrets in Azure Key Vault
+def delete_key_vault_secrets(vault_url, credentials):
+    # Authenticate using DefaultAzureCredential
+    credential = DefaultAzureCredential()
+    client = SecretClient(vault_url=vault_url, credential=credential)
+
+    for username, password in credentials.items():
+        secret_name = f"{username}"
+
+        print("\n.. Deleting secret...")
+        delete_operation = client.begin_delete_secret(secret_name)
+        deleted_secret = delete_operation.result()
+        assert deleted_secret.name
+        print(f"Deleted secret with name '{deleted_secret.name}'")
+
+        # Wait for the deletion to complete before purging the secret.
+        delete_operation.wait()
+        print("\n.. Purge the secret")
+        client.purge_deleted_secret(secret_name)
+        print(f"Purged secret with name '{secret_name}'")
+
+
+# Restore secrets in Azure Key Vault, the Key Vault must be the original one
+def restore_key_vault_secrets(vault_url, credentials):
+    # Authenticate using DefaultAzureCredential
+    credential = DefaultAzureCredential()
+    client = SecretClient(vault_url=vault_url, credential=credential)
+
+    for username, password in credentials.items():
+        secret_name = f"{username}"
+
+        backupfilename = f"kv_backup_{secret_name}.txt"
+        with open(backupfilename, "rb") as backupfile:
+            print("\n.. Restore the secret using the backed up secret bytes")
+            secret_properties = client.restore_secret_backup(backupfile.read())
+            print(f"Restored secret with name '{secret_properties.name}'")
+            backupfile.close()
 
 # Update Oracle database passwords
 def update_oracle_passwords(credentials,jdbc_url, driver_class, jar_file_path, db_user, db_password):
@@ -138,12 +193,22 @@ def main():
     credentials = load_credentials(credentials_file)
 
     # Get Azure Key Vault secrets
-    get_key_vault_secrets(vault_url, credentials)
+    #get_key_vault_secrets(vault_url, credentials)
+
+    # Back up Azure Key Vault secrets
+    #backup_key_vault_secrets(vault_url, credentials)
+
+    # Restore Azure Key Vault secrets, delete original secret beforehand to avoid secret name conflict
+    # The purge will take some time, so wait before restoring the backup to avoid a conflict.
+    #delete_key_vault_secrets(vault_url, credentials)
+    #time.sleep(60)
+    #restore_key_vault_secrets(vault_url, credentials)
 
     # Access Oracle database passwords
-    access_oracle(credentials, jdbc_url, driver_class, jar_file_path, db_user, db_password)
+    # access_oracle(credentials, jdbc_url, driver_class, jar_file_path, db_user, db_password)
 
     # Update Azure Key Vault secrets
+    #backup_key_vault_secrets(vault_url, credentials)
     #update_key_vault_secrets(vault_url, credentials)
 
     # Update Oracle database passwords
